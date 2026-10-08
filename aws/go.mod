@@ -2,8 +2,6 @@ module github.com/e2engine/instrumentation-go/aws
 
 go 1.25
 
-replace github.com/e2engine/instrumentation-go/http => ../http
-
 require (
 	github.com/aws/aws-sdk-go-v2 v1.47.2
 	github.com/aws/aws-sdk-go-v2/config v1.33.8
@@ -11,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.70.2
 	github.com/aws/smithy-go v1.28.4
 	github.com/e2engine/instrumentation-go v0.0.1
-	github.com/e2engine/instrumentation-go/http v0.0.0-00010101000000-000000000000
+	github.com/e2engine/instrumentation-go/http v0.0.1
 )
 
 require (

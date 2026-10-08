@@ -80,11 +80,6 @@ linters:
       - legacy
       - std-error-handling
     rules:
-      - path: ^(http|aws|grpc)/go\.mod$
-        text: "local replacement are not allowed: github.com/e2engine/instrumentation-go"
-        linters:
-          - gomoddirectives
-
       - path: _test\.go$
         linters:
           - dogsled
