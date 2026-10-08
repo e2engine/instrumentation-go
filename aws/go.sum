@@ -32,5 +32,5 @@ github.com/aws/smithy-go v1.28.4 h1:vzBmFpcRUtotqGPfmnro2W2Pgg3mk103n9sZhNJY9YU=
 github.com/aws/smithy-go v1.28.4/go.mod h1:YE2RhdIuDbA5E5bTdciG9KrW3+TiEONeUWCqxX9i1Fc=
 github.com/e2engine/instrumentation-go v0.1.1 h1:pkOQIQWWkGqHdU1F/b0tCtpFyNDc09kKebYZElHZS9k=
 github.com/e2engine/instrumentation-go v0.1.1/go.mod h1:zpWF7koAp+vFqYAfOx3mOJFn4GpLtzetguAs8n7+wIE=
-github.com/e2engine/instrumentation-go/http v0.1.0 h1:16VY0vkSqgSNJcYUT+tE3vn1uPEBcgL8bHLjKugnOvo=
-github.com/e2engine/instrumentation-go/http v0.1.0/go.mod h1:IPrXs81CHYPSn2NeKInAqZGFgfvHXOF1KsESVMxJegs=
+github.com/e2engine/instrumentation-go/http v0.1.1 h1:Xu+yRVgv6jsq7eBLzeOeccwM0dyNz2ga1ybaXNUFhTk=
+github.com/e2engine/instrumentation-go/http v0.1.1/go.mod h1:dFgPXV8kq17HHTecABNLaAio8td8LtdiNj9cZYS6Kng=
