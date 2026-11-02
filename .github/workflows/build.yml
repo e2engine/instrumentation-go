@@ -25,16 +25,20 @@ jobs:
           check-latest: true
 
       - name: Verify
-        run: make verify GO_TOOLCHAIN=local
+        run: make verify GO_TOOLCHAIN=local GRPC_GO_TOOLCHAIN=local
 
-  test-previous-versions:
-    name: Test (Go ${{ matrix.go-version }})
+  test-minimum-versions:
+    name: Test (${{ matrix.target }}, Go ${{ matrix.go-version }})
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        go-version: ['1.25.x', '1.26.x']
+        include:
+          - go-version: '1.25.12'
+            target: test-go125
+          - go-version: '1.26.0'
+            target: test-grpc
 
     steps:
       - name: Checkout
@@ -47,4 +51,4 @@ jobs:
           check-latest: true
 
       - name: Test
-        run: make test GO_TOOLCHAIN=local
+        run: make ${{ matrix.target }} GO_TOOLCHAIN=local GRPC_GO_TOOLCHAIN=local

@@ -8,7 +8,9 @@ BIN_DIR   ?= $(TOOLS_DIR)/bin
 OS   := $(shell uname -s | tr A-Z a-z)
 ARCH := $(shell uname -m)
 
-GOLANGCI_LINT_VERSION ?= $(shell go -C $(TOOLS_DIR) list -m -f '{{.Version}}' github.com/golangci/golangci-lint/v2)
+# Read the pin without loading the tools module, which needs a newer Go version
+# than the public modules. Test-only targets must work on their minimum Go.
+GOLANGCI_LINT_VERSION ?= $(shell awk '$$1 == "require" && $$2 == "github.com/golangci/golangci-lint/v2" { print $$3 } $$1 == "github.com/golangci/golangci-lint/v2" { print $$2 }' $(TOOLS_DIR)/go.mod)
 GOLANGCI_LINT := $(BIN_DIR)/golangci-lint-$(OS)-$(ARCH)-$(GOLANGCI_LINT_VERSION)
 GOLANGCI_LINT_LINK := $(BIN_DIR)/golangci-lint
 
