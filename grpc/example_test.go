@@ -11,8 +11,9 @@ import (
 )
 
 func ExampleUnaryServerInterceptor() {
-	// Instrument outgoing unary calls to propagate the E2Engine execution ID
-	// from the call context to gRPC metadata.
+	// Instrument outgoing unary calls. Exactly one valid execution ID in
+	// outgoing metadata takes precedence over the context ID. Otherwise, a valid
+	// context ID is used, or invalid and multiple outgoing ID values are removed.
 	connection, err := grpc.NewClient(
 		"dependency:8081",
 		grpc.WithTransportCredentials(

@@ -10,7 +10,7 @@ Instrumentation does not introduce an execution ID when no valid ID is available
 
 ## Requirements
 
-Go 1.25 or later.
+The root and HTTP modules require Go 1.25.12 or later. The gRPC module requires Go 1.26.0 or later. The AWS module declares Go 1.25; repository checks for that module use Go 1.25.12.
 
 ## Packages
 
@@ -182,7 +182,13 @@ go get github.com/e2engine/instrumentation-go/grpc
 
 E2Engine currently provides instrumentation for unary gRPC calls.
 
-Instrument the server and client with the corresponding interceptors:
+Instrument the server and client with the corresponding interceptors.
+
+gRPC instrumentation uses the `e2engine-test-execution-id` metadata key:
+
+- `UnaryServerInterceptor` uses `Extract` to accept exactly one valid incoming value. Missing, empty, invalid, or multiple values preserve the original context. A valid incoming ID replaces any execution ID already in context.
+- `UnaryClientInterceptor` uses `Inject` to preserve exactly one valid explicitly supplied outgoing value, even when context contains a different ID. If the outgoing ID is missing, invalid, or contains multiple values, a valid context ID is used instead. Without a valid context ID, invalid or multiple outgoing values are removed.
+- `Inject` preserves unrelated metadata and never modifies caller-owned metadata. It returns the original context when no changes are necessary. Values added with `metadata.AppendToOutgoingContext` follow the same rules and do not accumulate duplicate execution IDs through repeated injection.
 
 ```go
 package main
@@ -198,8 +204,8 @@ import (
 )
 
 func main() {
-    // Instrument outgoing unary calls to propagate the E2Engine execution ID
-    // from the call context to gRPC metadata.
+    // Instrument outgoing unary calls. A single valid outgoing metadata ID
+    // takes precedence; otherwise, a valid context ID is used.
     connection, err := grpc.NewClient(
         "dependency:8081",
         grpc.WithTransportCredentials(
@@ -249,7 +255,7 @@ md = e2enginegrpc.WithTestExecutionID(
 md = e2enginegrpc.WithoutTestExecutionID(md)
 ```
 
-The mutation helpers return copies and do not modify the supplied metadata. As with HTTP, these direct metadata helpers operate independently of context validation.
+`TestExecutionID` returns the first metadata value without validation, or an empty string if no value is present. `WithTestExecutionID` returns a copy: a valid ID replaces existing values; an invalid or empty ID removes the key. `WithoutTestExecutionID` returns a copy with the key removed. Neither mutation helper modifies the supplied metadata.
 
 ## AWS SDK for Go v2
 
@@ -504,6 +510,21 @@ Run tests for all modules:
 make test
 ```
 
+Aggregate targets select Go 1.25.12 for the root, HTTP, and AWS modules and Go 1.26.0 for gRPC. Each toolchain group can also be tested separately:
+
+```bash
+make test-go125
+make test-grpc
+```
+
+The same `-go125` and `-grpc` suffixes are available for `tidy`, `lint`, `lint-fix`, `test-cov`, `test-race`, and `verify`.
+
+Use `GO_TOOLCHAIN` to override the root, HTTP, and AWS toolchain and `GRPC_GO_TOOLCHAIN` to override the gRPC toolchain. For example, to test all modules with the installed Go version without automatic toolchain switching:
+
+```bash
+make test GO_TOOLCHAIN=local GRPC_GO_TOOLCHAIN=local
+```
+
 Run the full verification suite:
 
 ```bash
@@ -522,7 +543,7 @@ Run the race detector:
 make test-race
 ```
 
-The repository tests all public modules against the minimum supported Go version as part of CI.
+CI tests the root, HTTP, and AWS modules with Go 1.25.12 and gRPC with Go 1.26.0. It also runs lint and race tests for all modules with stable Go.
 
 ## License
 

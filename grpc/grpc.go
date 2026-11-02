@@ -14,13 +14,13 @@ const testExecutionIDKey = "e2engine-test-execution-id"
 // Extract returns a context containing the E2Engine test execution ID from the
 // incoming gRPC metadata.
 //
-// The execution ID is read from the incoming gRPC metadata and, when present,
+// The execution ID is read from the incoming gRPC metadata and, when valid,
 // is added to the context using e2engine.WithTestExecutionID. This allows the
 // execution ID to be carried through the application and propagated to outgoing
 // dependency calls.
 //
-// If the incoming context does not contain an E2Engine test execution ID,
-// Extract returns the original context unchanged.
+// If the incoming metadata is missing an execution ID, or contains an invalid
+// ID or multiple values, Extract returns the original context unchanged.
 func Extract(ctx context.Context) context.Context {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -28,7 +28,8 @@ func Extract(ctx context.Context) context.Context {
 	}
 
 	values := md.Get(testExecutionIDKey)
-	if len(values) == 0 || values[0] == "" {
+	if len(values) != 1 ||
+		!e2engine.ValidTestExecutionID(values[0]) {
 		return ctx
 	}
 
@@ -60,34 +61,51 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	}
 }
 
-// Inject returns an outgoing context containing the E2Engine test execution ID
-// from the context as gRPC metadata.
+// Inject returns a context containing a valid E2Engine test execution ID
+// as outgoing gRPC metadata.
 //
-// The execution ID is read from the context and, when present, is added to the
-// outgoing gRPC metadata. This allows E2Engine to correlate the outgoing gRPC
-// dependency call with the test execution that caused it.
+// Exactly one valid outgoing metadata value takes precedence over the execution
+// ID stored in the context. If the outgoing ID is absent, invalid, or contains
+// multiple values, a valid context ID is used instead. If neither source
+// provides a valid ID, any invalid or multiple execution ID values are removed.
 //
-// If the context does not contain an E2Engine test execution ID, Inject returns
-// the original context unchanged.
+// Inject never modifies caller-owned metadata. If no changes are necessary,
+// the original context is returned unchanged.
 func Inject(ctx context.Context) context.Context {
-	id := e2engine.TestExecutionID(ctx)
-	if id == "" {
+	md, _ := metadata.FromOutgoingContext(ctx)
+	values, exists := md[testExecutionIDKey]
+	if len(values) == 1 && e2engine.ValidTestExecutionID(values[0]) {
 		return ctx
 	}
 
-	return metadata.AppendToOutgoingContext(
-		ctx,
-		testExecutionIDKey,
-		id,
-	)
+	id := e2engine.TestExecutionID(ctx)
+	validContextID := e2engine.ValidTestExecutionID(id)
+	if !exists && !validContextID {
+		return ctx
+	}
+
+	// FromOutgoingContext returns a copy, so these changes cannot modify the
+	// original metadata, including values added with AppendToOutgoingContext.
+	if validContextID {
+		if md == nil {
+			md = make(metadata.MD)
+		}
+		md.Set(testExecutionIDKey, id)
+	} else {
+		md.Delete(testExecutionIDKey)
+	}
+
+	return metadata.NewOutgoingContext(ctx, md)
 }
 
 // UnaryClientInterceptor returns a gRPC unary client interceptor that injects
 // the E2Engine test execution ID into outgoing gRPC metadata.
 //
-// The interceptor uses Inject before invoking the RPC. The execution ID must
-// therefore be present in the context, typically because the context originated
-// from an inbound request processed by UnaryServerInterceptor or Extract.
+// The interceptor uses Inject before invoking the RPC. Exactly one valid ID in
+// outgoing metadata takes precedence over the context ID. Otherwise, a valid
+// context ID is used, typically originating from UnaryServerInterceptor or
+// Extract. Without a valid fallback, invalid or multiple outgoing ID values are
+// removed. Unrelated metadata and the original context are preserved.
 func UnaryClientInterceptor() grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context,
@@ -113,7 +131,7 @@ func UnaryClientInterceptor() grpc.UnaryClientInterceptor {
 // metadata.
 //
 // If the metadata does not contain an E2Engine test execution ID,
-// TestExecutionID returns an empty string.
+// TestExecutionID returns an empty string. The returned value is not validated.
 func TestExecutionID(md metadata.MD) string {
 	values := md.Get(testExecutionIDKey)
 	if len(values) == 0 {
@@ -126,13 +144,13 @@ func TestExecutionID(md metadata.MD) string {
 // WithTestExecutionID returns a copy of the gRPC metadata containing the
 // provided E2Engine test execution ID.
 //
-// If the metadata already contains an E2Engine test execution ID, it is
-// replaced. If id is empty, any existing execution ID is removed. The supplied
-// metadata is not modified.
+// If id is valid, it replaces any existing execution ID. If id is empty or
+// invalid, any existing execution ID is removed. The supplied metadata is
+// not modified.
 func WithTestExecutionID(md metadata.MD, id string) metadata.MD {
 	result := md.Copy()
 
-	if id == "" {
+	if !e2engine.ValidTestExecutionID(id) {
 		result.Delete(testExecutionIDKey)
 		return result
 	}
