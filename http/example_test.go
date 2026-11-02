@@ -8,8 +8,10 @@ import (
 )
 
 func ExampleHandler() {
-	// Instrument outgoing HTTP requests to propagate the E2Engine execution ID
-	// from the request context to HTTP headers.
+	// Instrument outgoing HTTP requests.
+	//
+	// An existing valid E2Engine execution ID header takes precedence.
+	// Otherwise, a valid execution ID from the request context is propagated.
 	client := &http.Client{
 		Transport: e2enginehttp.Transport(),
 	}
@@ -37,7 +39,7 @@ func ExampleHandler() {
 		w.WriteHeader(response.StatusCode)
 	})
 
-	// Instrument incoming HTTP requests to extract the E2Engine execution ID
-	// from HTTP headers into the request context.
+	// Instrument incoming HTTP requests to extract a single valid E2Engine
+	// execution ID from HTTP headers into the request context.
 	log.Fatal(http.ListenAndServe(":8080", e2enginehttp.Handler()))
 }
