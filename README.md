@@ -6,11 +6,11 @@ Part of [E2Engine](https://e2engine.dev), an open-source platform for declarativ
 
 E2Engine uses a test execution ID to correlate calls made by a system under test with the test execution that caused them. This repository provides lightweight instrumentation for carrying that ID through Go applications and propagating it across supported protocols.
 
-Instrumentation does not introduce an execution ID when no valid ID is available. HTTP outbound instrumentation still removes invalid or ambiguous execution-ID headers. The same application binary can be used both with and without E2Engine.
+Instrumentation does not introduce an execution ID when no valid ID is available. Outbound instrumentation still removes invalid or ambiguous execution-ID headers or metadata. The same application binary can be used both with and without E2Engine.
 
 ## Requirements
 
-The root and HTTP modules require Go 1.25.12 or later. The gRPC module requires Go 1.26.0 or later. The AWS module declares Go 1.25; repository checks for that module use Go 1.25.12.
+The root, HTTP, and AWS modules require Go 1.25.12 or later. The gRPC module requires Go 1.26.0 or later.
 
 ## Packages
 
@@ -292,7 +292,7 @@ func main() {
 }
 ```
 
-The context passed to individual AWS SDK operations must carry the execution ID:
+Exactly one valid `E2Engine-Test-Execution-ID` outgoing header value takes precedence over the operation context. If the header is missing, invalid, or contains multiple values, the context passed to the individual AWS SDK operation supplies the fallback ID:
 
 ```go
 _, err := client.PutItem(
@@ -305,7 +305,7 @@ _, err := client.PutItem(
 
 The instrumentation adds the execution ID during the Smithy Build step, before AWS request signing. When an execution ID is present, the propagation header is included in the AWS SigV4 signed headers.
 
-No request modification is performed when the operation context does not contain an E2Engine test execution ID.
+If neither source supplies a valid ID, invalid or multiple execution-ID header values are removed before signing. The original request and unrelated headers are preserved; a copy is passed downstream only when a change is needed. The Smithy request stream is preserved.
 
 ## AWS Lambda
 
@@ -355,6 +355,8 @@ The wrapper extracts the `E2Engine-Test-Execution-ID` HTTP header, validates the
 
 Header names are handled case-insensitively, including the lowercase header names normally supplied by API Gateway HTTP API v2.
 
+Exactly one valid header value is accepted. Missing, empty, malformed, or comma-joined values are ignored, as are multiple matching header names with different casing. API Gateway HTTP API v2 combines repeated header values with commas. Rejected IDs leave the original context unchanged, including any existing execution ID; a valid incoming ID replaces it.
+
 The wrapper does not modify the original API Gateway request, HTTP response, or handler error.
 
 ### Lower-level Lambda helpers
@@ -369,7 +371,7 @@ id := e2enginelambda.TestExecutionID(request.Headers)
 
 `Extract` validates the ID through `e2engine.WithTestExecutionID` and preserves the original context when the header contains no valid ID.
 
-`TestExecutionID` reads the raw header value without validating it.
+`TestExecutionID` reads the raw header value without validating it. It returns an empty string when the header is missing or appears under multiple case-insensitive names.
 
 ### Combining Lambda and AWS SDK instrumentation
 

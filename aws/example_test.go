@@ -10,7 +10,9 @@ import (
 )
 
 func ExampleOption() {
-	// import e2engineaws "github.com/e2engine/instrumentation-go/aws"
+	// One valid explicit outgoing execution ID overrides the operation context.
+	// Otherwise, a valid context ID is used, or invalid/multiple IDs are removed.
+	// Pass the incoming request context to individual SDK operations.
 
 	cfg, err := config.LoadDefaultConfig(context.TODO(), e2engineaws.Option())
 	if err != nil {
