@@ -8,26 +8,45 @@ import (
 
 const testExecutionIDHeader = "E2Engine-Test-Execution-ID"
 
-// Inject returns a request containing the E2Engine test execution ID from its
-// context as an HTTP header.
+// Inject returns a request containing a valid E2Engine test execution ID
+// as an HTTP header.
 //
-// The execution ID is read from the request context and, when valid, is added
-// to the outgoing HTTP request. This allows E2Engine to correlate the outgoing
-// HTTP dependency call with the test execution that caused it.
+// Exactly one valid execution ID header value takes precedence over the
+// execution ID stored in the request context.
 //
-// Inject clones the request before adding the header and does not modify the
-// original request. If the context does not contain a valid E2Engine test
-// execution ID, Inject returns the original request unchanged.
+// If the existing header is absent, invalid, or contains multiple values, a
+// valid execution ID from the context is used instead. If neither source
+// provides a valid ID, any invalid or multiple execution ID values are removed.
+//
+// Inject never modifies the original request. If no changes are necessary,
+// the original request is returned unchanged.
 func Inject(r *http.Request) *http.Request {
-	id := e2engine.TestExecutionID(r.Context())
-	if !e2engine.ValidTestExecutionID(id) {
+	values, exists := r.Header[http.CanonicalHeaderKey(testExecutionIDHeader)]
+
+	if exists && len(values) == 1 &&
+		e2engine.ValidTestExecutionID(values[0]) {
 		return r
 	}
 
-	r = r.Clone(r.Context())
-	r.Header.Set(testExecutionIDHeader, id)
+	contextID := e2engine.TestExecutionID(r.Context())
+	validContextID := e2engine.ValidTestExecutionID(contextID)
 
-	return r
+	if !exists && !validContextID {
+		return r
+	}
+
+	result := r.Clone(r.Context())
+
+	if validContextID {
+		if result.Header == nil {
+			result.Header = make(http.Header)
+		}
+		result.Header.Set(testExecutionIDHeader, contextID)
+	} else {
+		result.Header.Del(testExecutionIDHeader)
+	}
+
+	return result
 }
 
 type transport struct {
@@ -44,9 +63,10 @@ func (t transport) RoundTrip(
 // ID into outgoing HTTP requests.
 //
 // Transport uses Inject for each request before passing it to the wrapped
-// transport. The execution ID must therefore be present in the request context,
-// typically because the context originated from an inbound request processed by
-// Handler or Extract.
+// transport. Exactly one valid execution ID header value takes precedence over
+// the request context. If the header is absent, invalid, or contains multiple
+// values, Transport uses a valid execution ID from the request context,
+// typically originating from an inbound request processed by Handler or Extract.
 //
 // Transport can wrap an existing HTTP transport:
 //
@@ -56,9 +76,10 @@ func (t transport) RoundTrip(
 //
 //	client := &http.Client{Transport: Transport()}
 //
-// If the request context does not contain a valid E2Engine test execution ID,
-// the outgoing request is left unchanged. Transport accepts at most one
-// transport and panics if more than one is supplied.
+// If neither the request headers nor its context contain a valid execution
+// ID, any invalid or multiple execution ID values are removed. If no changes
+// are necessary, the original request is passed to the wrapped transport.
+// Transport accepts at most one transport and panics if more than one is supplied.
 func Transport(next ...http.RoundTripper) http.RoundTripper {
 	if len(next) > 1 {
 		panic("e2engine http Transport accepts at most one transport")
@@ -78,23 +99,23 @@ func Transport(next ...http.RoundTripper) http.RoundTripper {
 // Extract returns a request whose context contains the E2Engine test execution
 // ID from the incoming HTTP request.
 //
-// The execution ID is read from the incoming HTTP headers and, when valid, is
-// added to the request context using e2engine.WithTestExecutionID. This allows
-// the execution ID to be carried through the application and propagated to
-// outgoing dependency calls.
+// The execution ID is read from the incoming HTTP headers and, when valid,
+// is added to the request context using e2engine.WithTestExecutionID.
 //
-// If the request does not contain a valid E2Engine test execution ID, Extract
+// If the header is missing, invalid, or contains multiple values, Extract
 // returns the original request unchanged.
 func Extract(r *http.Request) *http.Request {
-	id := r.Header.Get(testExecutionIDHeader)
-	if !e2engine.ValidTestExecutionID(id) {
+	values := r.Header.Values(testExecutionIDHeader)
+
+	if len(values) != 1 ||
+		!e2engine.ValidTestExecutionID(values[0]) {
 		return r
 	}
 
 	return r.WithContext(
 		e2engine.WithTestExecutionID(
 			r.Context(),
-			id,
+			values[0],
 		),
 	)
 }
@@ -165,6 +186,9 @@ func WithTestExecutionID(
 		return result
 	}
 
+	if result == nil {
+		result = make(http.Header)
+	}
 	result.Set(testExecutionIDHeader, id)
 
 	return result

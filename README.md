@@ -6,7 +6,7 @@ Part of [E2Engine](https://e2engine.dev), an open-source platform for declarativ
 
 E2Engine uses a test execution ID to correlate calls made by a system under test with the test execution that caused them. This repository provides lightweight instrumentation for carrying that ID through Go applications and propagating it across supported protocols.
 
-Instrumentation is inactive when no valid E2Engine test execution ID is present, so the same application binary can be used both with and without E2Engine.
+Instrumentation does not introduce an execution ID when no valid ID is available. HTTP outbound instrumentation still removes invalid or ambiguous execution-ID headers. The same application binary can be used both with and without E2Engine.
 
 ## Requirements
 
@@ -82,7 +82,13 @@ Install the HTTP module:
 go get github.com/e2engine/instrumentation-go/http
 ```
 
-Instrument incoming requests with `Handler` and outgoing requests with `Transport`:
+Instrument incoming requests with `Handler` and outgoing requests with `Transport`.
+
+HTTP instrumentation uses the `E2Engine-Test-Execution-ID` header:
+
+- `Handler` uses `Extract` to accept exactly one valid incoming header value. Missing, empty, invalid, or multiple values leave the original request and context unchanged. A valid incoming ID replaces any execution ID already in context.
+- `Transport` uses `Inject` to preserve exactly one valid explicitly supplied outgoing header value, even when context contains a different ID. If the header is missing, invalid, or contains multiple values, a valid context ID is used instead. Without a valid context ID, invalid or multiple header values are removed.
+- `Inject` never modifies the supplied request or its headers. It clones the request only when changes are necessary and otherwise returns the original request.
 
 ```go
 package main
@@ -164,7 +170,7 @@ header = e2enginehttp.WithoutTestExecutionID(header)
 
 Here, `executionID` is a valid 64-character E2Engine execution ID.
 
-The mutation helpers return copies and do not modify the supplied headers. These direct header helpers operate on HTTP headers rather than through context validation.
+`TestExecutionID` returns the first header value without validation, or an empty string if no value is present. `WithTestExecutionID` returns a copy: a valid ID replaces existing values; an invalid or empty ID removes the header. `WithoutTestExecutionID` returns a copy with the header removed. Neither mutation helper modifies the supplied headers.
 
 ## gRPC
 
@@ -477,6 +483,18 @@ This means a separate E2Engine-specific application build is not required.
 Execution IDs are treated as untrusted correlation metadata. Invalid identifiers are ignored by the context API rather than causing request failures.
 
 Instrumentation does not provide authentication, authorization, or verification of the identity of the caller. Applications must enforce their own security controls.
+
+## Execution ID precedence
+
+When making an outgoing dependency call, instrumentation first examines the execution ID explicitly supplied in the outgoing request headers or metadata.
+
+If exactly one valid execution ID is present, it is preserved, even if the application context contains a different ID.
+
+If the outgoing execution ID is absent, invalid, or ambiguous, instrumentation falls back to the valid execution ID stored in context.Context.
+
+If neither source provides a valid ID, the outgoing request contains no E2Engine execution ID.
+
+This allows applications to explicitly override execution-ID propagation when necessary, while preventing malformed or ambiguous IDs from being forwarded.
 
 ## Development
 
