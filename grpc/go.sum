@@ -1,5 +1,5 @@
-github.com/e2engine/instrumentation-go v0.2.1 h1:tQV4HcPCxE25S0zkZ+ga94voX66LXaEcs/A/WZUplP0=
-github.com/e2engine/instrumentation-go v0.2.1/go.mod h1:DyUxzrRZBCzOk+toAmxex+Xn09fYhutsCRUfNUgS8kQ=
+github.com/e2engine/instrumentation-go v0.2.3 h1:Al7SoAIiMHiJ4zxj71JYiFCE9MKgpXFGHxlZCHmbe+0=
+github.com/e2engine/instrumentation-go v0.2.3/go.mod h1:DyUxzrRZBCzOk+toAmxex+Xn09fYhutsCRUfNUgS8kQ=
 github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
 github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
