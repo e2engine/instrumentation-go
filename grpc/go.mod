@@ -3,7 +3,7 @@ module github.com/e2engine/instrumentation-go/grpc
 go 1.26.0
 
 require (
-	github.com/e2engine/instrumentation-go v0.2.1
+	github.com/e2engine/instrumentation-go v0.2.3
 	google.golang.org/grpc v1.85.0
 )
 
